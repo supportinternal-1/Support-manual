@@ -262,7 +262,7 @@
       background: white;
       border-radius: 12px;
       padding: 16px 20px;
-      margin-bottom: 12px;
+      margin-bottom:  12px;
       border: 1.5px solid #e0e0e0;
       cursor: pointer;
       transition: 0.2s;
@@ -292,7 +292,12 @@
 
   <div class="header">
     <div class="header-left">
-      <img src="Volt Logo.png" alt="Volt Logo" class="header-logo" />
+      <!-- Using GitHub RAW URL (edit branch/path if needed) -->
+      <img
+        src="https://raw.githubusercontent.com/supportinternal-1/Support-manual/main/Volt%20Logo.png"
+        alt="Volt Logo"
+        class="header-logo"
+      />
       <h1>Volt Money — Support Manual</h1>
     </div>
     <span>Internal Use Only</span>
@@ -329,13 +334,10 @@
     let allData = [];
     let currentType = null;
 
-    // ✅ Dono formats handle karta hai — plain URL bhi, [Text](URL) bhi
     function parseLinks(text) {
-      // Step 1: [Text](URL) format
       text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
         '<a href="$2" target="_blank">$1</a>'
       );
-      // Step 2: Plain URL format
       text = text.replace(/(^|[\s\n])((https?:\/\/)[^\s<]+)/g,
         '$1<a href="$2" target="_blank">$2</a>'
       );
