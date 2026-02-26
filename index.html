@@ -38,13 +38,21 @@
       display: flex;
       align-items: center;
       gap: 12px;
+      min-width: 0;
     }
     .header-logo {
       height: 34px;
       width: auto;
       object-fit: contain;
+      flex: 0 0 auto;
     }
-    .header h1 { font-size: 18px; font-weight: 700; }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .header span { font-size: 13px; opacity: 0.8; }
 
     .main-layout {
@@ -262,7 +270,7 @@
       background: white;
       border-radius: 12px;
       padding: 16px 20px;
-      margin-bottom:  12px;
+      margin-bottom: 12px;
       border: 1.5px solid #e0e0e0;
       cursor: pointer;
       transition: 0.2s;
@@ -292,12 +300,7 @@
 
   <div class="header">
     <div class="header-left">
-      <!-- Using GitHub RAW URL (edit branch/path if needed) -->
-      <img
-        src="https://raw.githubusercontent.com/supportinternal-1/Support-manual/main/Volt%20Logo.png"
-        alt="Volt Logo"
-        class="header-logo"
-      />
+      <img id="voltLogo" alt="Volt Logo" class="header-logo" />
       <h1>Volt Money — Support Manual</h1>
     </div>
     <span>Internal Use Only</span>
@@ -329,6 +332,33 @@
   </div>
 
   <script>
+    // =========================
+    // LOGO CONFIG (EDIT THESE)
+    // =========================
+    // NOTE: GitHub RAW URL format: https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>
+    // Spaces in filename must be %20. [web:20][web:21]
+    const LOGO_PRIMARY_URL  = "https://raw.githubusercontent.com/supportinternal-1/Support-manual/main/Volt%20Logo.png";
+    const LOGO_FALLBACK_URL = "Volt Logo.png"; // local file in same folder as HTML
+
+    // Optional: if primary fails, try an alternate branch name too
+    const LOGO_ALT_URL = "https://raw.githubusercontent.com/supportinternal-1/Support-manual/master/Volt%20Logo.png";
+
+    function setLogoWithFallback() {
+      const img = document.getElementById("voltLogo");
+
+      // Try primary
+      img.src = LOGO_PRIMARY_URL;
+
+      img.onerror = () => {
+        // Try alternate (master) next, then fallback to local
+        if (img.src === LOGO_PRIMARY_URL) {
+          img.src = LOGO_ALT_URL;
+          return;
+        }
+        img.src = LOGO_FALLBACK_URL;
+      };
+    }
+
     const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwAqD2jfG2cKo7K7LojTWweEFPinjhQYVsgYA9wPHOCHRIJIw-QQdin59l9dgPMmkbk/exec';
 
     let allData = [];
@@ -501,6 +531,7 @@
       return str.replace(/'/g, "\\'");
     }
 
+    setLogoWithFallback();
     fetchData();
   </script>
 
