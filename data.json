@@ -1,0 +1,55 @@
+[]
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx2VehiToTYcCiFwzsUZZee0lRQv-H-8Bbd2huvReIKBWUv6SCw1zZ34-YDNHBhArjm/exec';
+
+  const PRE_LOAN_TYPES = [
+    'login & mobile number registration',
+    'kyc issue'
+  ];
+
+  function getLoanCategory(type) {
+    if (!type) return 'post';
+    return PRE_LOAN_TYPES.includes(type.toLowerCase().trim()) ? 'pre' : 'post';
+  }
+
+  try {
+    // Node fetch use karo — redirect automatically handle hoga
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'GET',
+      redirect: 'follow'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error: ${response.status}`);
+    }
+
+    const parsed = await response.json();
+
+    // Empty rows filter karo
+    const clean = parsed.filter(row =>
+      (row['Type'] && row['Type'].trim() !== '') ||
+      (row['Sub Type'] && row['Sub Type'].trim() !== '')
+    );
+
+    // Merged cells fix
+    let lastType = '';
+    const final = clean.map(row => {
+      if (row['Type'] && row['Type'].trim() !== '') {
+        lastType = row['Type'].trim();
+      }
+      return {
+        type: lastType,
+        subType: (row['Sub Type'] || '').trim(),
+        preChecks: (row['Pre-checks'] || '').trim(),
+        escalationPath: (row['Escalation Path'] || '').trim(),
+        loanCategory: getLoanCategory(lastType)
+      };
+    });
+
+    res.status(200).json(final);
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
