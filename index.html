@@ -424,7 +424,7 @@ html += `<div class="sidebar-section-title ${isImportant ? 'alert' : ''}">${isIm
 
         types.forEach(type => {
           const isActive = currentType === type ? 'active' : '';
-          html += `<div class="sidebar-item ${isActive}"
+html += `<div class="sidebar-item ${isActive} ${isImportant ? 'alert-item' : ''}"
                         onclick="showSubTypes('${escQ(type)}')">
                      <span class="dot"></span>${type}
                    </div>`;
