@@ -89,7 +89,7 @@
       padding: 10px 0;
     }
 
-    /* ── ONLY CHANGE: section titles are bold + larger ── */
+    /* ── Section titles: bold + larger ── */
     .sidebar-section-title {
       font-size: 15px;
       font-weight: 800;
@@ -100,7 +100,7 @@
       margin-top: 4px;
     }
 
-    /* ── Sidebar items: EXACTLY as original ── */
+    /* ── Sidebar items: exactly as original ── */
     .sidebar-item {
       display: flex;
       align-items: center;
@@ -357,16 +357,25 @@
     }
 
     const CATEGORY_CONFIG = {
-      'important update':  { order: 0, emoji: '🔔', dotClass: null,                  isImportant: true  },
-      'pre loan':          { order: 1, emoji: '🟡', dotClass: 'dot-pre',              isImportant: false },
-      'post loan':         { order: 2, emoji: '🔵', dotClass: 'dot-post',             isImportant: false },
-      'modules':           { order: 3, emoji: '📘', dotClass: 'dot-modules',          isImportant: false },
-      'line enhancement':  { order: 4, emoji: '🟢', dotClass: 'dot-line-enhancement', isImportant: false },
+      'important update':  { emoji: '🔔', dotClass: null,                  isImportant: true  },
+      'pre loan':          { emoji: '🟡', dotClass: 'dot-pre',              isImportant: false },
+      'post loan':         { emoji: '🔵', dotClass: 'dot-post',             isImportant: false },
+      'modules':           { emoji: '📘', dotClass: 'dot-modules',          isImportant: false },
+      'line enhancement':  { emoji: '🟢', dotClass: 'dot-line-enhancement', isImportant: false },
     };
+
+    // Fixed sidebar order — Important Update is ALWAYS first
+    const FIXED_ORDER = [
+      'important update',
+      'pre loan',
+      'post loan',
+      'modules',
+      'line enhancement'
+    ];
 
     function getCategoryConfig(rawCat) {
       return CATEGORY_CONFIG[normalizeKey(rawCat)] ||
-             { order: 99, emoji: '⚪', dotClass: 'dot-fallback', isImportant: false };
+             { emoji: '⚪', dotClass: 'dot-fallback', isImportant: false };
     }
 
     function getCategoryLabel(rawCat) {
@@ -435,10 +444,15 @@
         }
       });
 
-      const sortedKeys = Object.keys(categoryMap).sort((a, b) => {
-        const oA = (CATEGORY_CONFIG[a] || { order: 99 }).order;
-        const oB = (CATEGORY_CONFIG[b] || { order: 99 }).order;
-        return oA - oB;
+      // Step 1: Add known categories in guaranteed fixed order
+      const sortedKeys = [];
+      FIXED_ORDER.forEach(key => {
+        if (categoryMap[key]) sortedKeys.push(key);
+      });
+
+      // Step 2: Append any unknown/future categories at the bottom
+      Object.keys(categoryMap).forEach(key => {
+        if (!FIXED_ORDER.includes(key)) sortedKeys.push(key);
       });
 
       if (sortedKeys.length === 0) {
