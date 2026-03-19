@@ -89,7 +89,7 @@
       padding: 10px 0;
     }
 
-    /* ── Section titles: bold + larger ── */
+    /* ── Normal section titles: bold + larger ── */
     .sidebar-section-title {
       font-size: 15px;
       font-weight: 800;
@@ -100,7 +100,20 @@
       margin-top: 4px;
     }
 
-    /* ── Sidebar items: exactly as original ── */
+    /* ── Important Update alert section title ── */
+    .sidebar-section-title.alert {
+      background: #e74c3c;
+      color: white;
+      border-radius: 6px;
+      margin: 6px 10px 2px 10px;
+      padding: 10px 12px 8px;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* ── Normal sidebar items: exactly as original ── */
     .sidebar-item {
       display: flex;
       align-items: center;
@@ -121,6 +134,24 @@
       border-left: 3px solid #2f3ac7;
     }
 
+    /* ── Important Update alert items ── */
+    .sidebar-item.alert-item {
+      background: #fff0f0;
+      border-left: 3px solid #e74c3c;
+      color: #c0392b;
+      font-weight: 500;
+    }
+    .sidebar-item.alert-item:hover {
+      background: #ffe0e0;
+      color: #c0392b;
+    }
+    .sidebar-item.alert-item.active {
+      background: #ffd5d5;
+      border-left: 3px solid #c0392b;
+      color: #c0392b;
+      font-weight: 600;
+    }
+
     .dot {
       width: 9px;
       height: 9px;
@@ -128,6 +159,16 @@
       flex-shrink: 0;
       display: inline-block;
       background: #2f3ac7;
+    }
+
+    .dot.alert-dot {
+      background: #e74c3c;
+    }
+
+    .bell-icon {
+      font-size: 15px;
+      flex-shrink: 0;
+      line-height: 1;
     }
 
     .sidebar-divider {
@@ -342,6 +383,13 @@
     let allData = [];
     let currentType = null;
 
+    // Detect if a category is an "Important Update" type
+    // Matches any variation: "Important Update", "Impotant updates", etc.
+    function isAlertCategory(cat) {
+      const c = (cat || '').toLowerCase();
+      return c.includes('important') || c.includes('impotant') || c.includes('alert');
+    }
+
     function parseLinks(text) {
       text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
         '<a href="$2" target="_blank">$1</a>'
@@ -388,24 +436,17 @@
     }
 
     function buildSidebar() {
-      // ── Fully dynamic: preserves exact order from sheet ──
-      // Category order = first time each category appears in the sheet
-      // Type order = first time each type appears under that category in the sheet
-
-      const categoryOrder = [];   // ordered list of category names
-      const categoryMap   = {};   // category → ordered list of types
-      const typeCategory  = {};   // type → its category (for breadcrumb)
+      const categoryOrder = [];
+      const categoryMap   = {};
 
       allData.forEach(r => {
         if (!r.category || !r.type) return;
-
         if (!categoryMap[r.category]) {
           categoryMap[r.category] = [];
           categoryOrder.push(r.category);
         }
         if (!categoryMap[r.category].includes(r.type)) {
           categoryMap[r.category].push(r.type);
-          typeCategory[r.type] = r.category;
         }
       });
 
@@ -417,17 +458,30 @@
 
       let html = '';
       categoryOrder.forEach((cat, idx) => {
-        const types = categoryMap[cat];
+        const types   = categoryMap[cat];
+        const isAlert = isAlertCategory(cat);
 
-const isImportant = cat.toLowerCase().includes('important') || cat.toLowerCase().includes('update');
-html += `<div class="sidebar-section-title ${isImportant ? 'alert' : ''}">${isImportant ? '🔔 ' : ''}${cat}</div>`;
+        // Section title — red box for alert, normal for others
+        if (isAlert) {
+          html += `<div class="sidebar-section-title alert">🔔 ${cat}</div>`;
+        } else {
+          html += `<div class="sidebar-section-title">${cat}</div>`;
+        }
 
         types.forEach(type => {
           const isActive = currentType === type ? 'active' : '';
-html += `<div class="sidebar-item ${isActive} ${isImportant ? 'alert-item' : ''}"
-                        onclick="showSubTypes('${escQ(type)}')">
-                     <span class="dot"></span>${type}
-                   </div>`;
+
+          if (isAlert) {
+            html += `<div class="sidebar-item alert-item ${isActive}"
+                          onclick="showSubTypes('${escQ(type)}')">
+                       <span class="bell-icon">🔔</span>${type}
+                     </div>`;
+          } else {
+            html += `<div class="sidebar-item ${isActive}"
+                          onclick="showSubTypes('${escQ(type)}')">
+                       <span class="dot"></span>${type}
+                     </div>`;
+          }
         });
 
         if (idx < categoryOrder.length - 1) {
