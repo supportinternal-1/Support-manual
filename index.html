@@ -38,21 +38,13 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      min-width: 0;
     }
     .header-logo {
       height: 34px;
       width: auto;
       object-fit: contain;
-      flex: 0 0 auto;
     }
-    .header h1 {
-      font-size: 18px;
-      font-weight: 700;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+    .header h1 { font-size: 18px; font-weight: 700; }
     .header span { font-size: 13px; opacity: 0.8; }
 
     .main-layout {
@@ -98,22 +90,24 @@
     }
 
     .sidebar-section-title {
-      font-size: 11px;
-      font-weight: 700;
+      font-size: 12px;
+      font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 1px;
-      color: #888;
+      color: #555;
       padding: 10px 18px 6px;
       margin-top: 4px;
     }
+
     .sidebar-item {
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 10px 18px;
       cursor: pointer;
-      font-size: 13.5px;
-      color: #333;
+      font-size: 15px;
+      font-weight: 700;
+      color: #222;
       border-left: 3px solid transparent;
       transition: 0.15s;
     }
@@ -121,13 +115,33 @@
     .sidebar-item.active {
       background: #eef0ff;
       color: #2f3ac7;
-      font-weight: 600;
       border-left: 3px solid #2f3ac7;
     }
-    .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-    .dot-pre  { background: #f5c518; }
-    .dot-post { background: #2f3ac7; }
-    .sidebar-divider { height: 1px; background: #e8e8e8; margin: 8px 14px; }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: inline-block;
+    }
+    .dot-pre              { background: #f5c518; }
+    .dot-post             { background: #2f3ac7; }
+    .dot-modules          { background: #9b59b6; }
+    .dot-line-enhancement { background: #27ae60; }
+    .dot-fallback         { background: #95a5a6; }
+
+    .bell-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .sidebar-divider {
+      height: 1px;
+      background: #e8e8e8;
+      margin: 8px 14px;
+    }
 
     .content-wrapper {
       flex: 1;
@@ -147,7 +161,7 @@
       z-index: 1;
     }
     .welcome-box {
-      background: rgba(60, 60, 70, 0.62);
+      background: rgba(60,60,70,0.62);
       border-radius: 16px;
       padding: 36px 48px;
       backdrop-filter: blur(6px);
@@ -300,14 +314,13 @@
 
   <div class="header">
     <div class="header-left">
-      <img id="voltLogo" alt="Volt Logo" class="header-logo" />
+      <img src="Volt Logo.png" alt="Volt Logo" class="header-logo" />
       <h1>Volt Money — Support Manual</h1>
     </div>
     <span>Internal Use Only</span>
   </div>
 
   <div class="main-layout">
-
     <div class="sidebar">
       <div class="sidebar-search">
         <input type="text" id="searchInput"
@@ -328,47 +341,48 @@
       </div>
       <div class="content-inner" id="contentInner"></div>
     </div>
-
   </div>
 
   <script>
-    // =========================
-    // LOGO CONFIG (EDIT THESE)
-    // =========================
-    // NOTE: GitHub RAW URL format: https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>
-    // Spaces in filename must be %20. [web:20][web:21]
-    const LOGO_PRIMARY_URL  = "https://raw.githubusercontent.com/supportinternal-1/Support-manual/main/Volt%20Logo.png";
-    const LOGO_FALLBACK_URL = "Volt Logo.png"; // local file in same folder as HTML
-
-    // Optional: if primary fails, try an alternate branch name too
-    const LOGO_ALT_URL = "https://raw.githubusercontent.com/supportinternal-1/Support-manual/master/Volt%20Logo.png";
-
-    function setLogoWithFallback() {
-      const img = document.getElementById("voltLogo");
-
-      // Try primary
-      img.src = LOGO_PRIMARY_URL;
-
-      img.onerror = () => {
-        // Try alternate (master) next, then fallback to local
-        if (img.src === LOGO_PRIMARY_URL) {
-          img.src = LOGO_ALT_URL;
-          return;
-        }
-        img.src = LOGO_FALLBACK_URL;
-      };
-    }
-
     const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwAqD2jfG2cKo7K7LojTWweEFPinjhQYVsgYA9wPHOCHRIJIw-QQdin59l9dgPMmkbk/exec';
 
     let allData = [];
     let currentType = null;
 
+    // ── Normalize category: trim + lowercase for safe matching ──
+    function normalizeKey(str) {
+      return (str || '').toString().trim().toLowerCase();
+    }
+
+    // ── Category config keyed by normalized lowercase name ──
+    const CATEGORY_CONFIG = {
+      'important update':  { order: 0, emoji: '🔔', dotClass: null,               isImportant: true  },
+      'pre loan':          { order: 1, emoji: '🟡', dotClass: 'dot-pre',           isImportant: false },
+      'post loan':         { order: 2, emoji: '🔵', dotClass: 'dot-post',          isImportant: false },
+      'modules':           { order: 3, emoji: '📘', dotClass: 'dot-modules',       isImportant: false },
+      'line enhancement':  { order: 4, emoji: '🟢', dotClass: 'dot-line-enhancement', isImportant: false },
+    };
+
+    // Fallback for any unknown future category
+    function getCategoryConfig(rawCat) {
+      const key = normalizeKey(rawCat);
+      return CATEGORY_CONFIG[key] || { order: 99, emoji: '⚪', dotClass: 'dot-fallback', isImportant: false };
+    }
+
+    // Full label with emoji — uses original casing from sheet
+    function getCategoryLabel(rawCat) {
+      const cfg = getCategoryConfig(rawCat);
+      return `${cfg.emoji} ${rawCat}`;
+    }
+
+    // ── Link parser: handles [Text](URL) and plain URLs ──
     function parseLinks(text) {
-      text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+      // Step 1: Markdown-style [Text](URL)
+      text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
         '<a href="$2" target="_blank">$1</a>'
       );
-      text = text.replace(/(^|[\s\n])((https?:\/\/)[^\s<]+)/g,
+      // Step 2: Plain URLs not already inside an href
+      text = text.replace(/(^|[\s\n])(https?:\/\/[^\s<"]+)/g,
         '$1<a href="$2" target="_blank">$2</a>'
       );
       return text;
@@ -394,14 +408,13 @@
         const data = await res.json();
 
         allData = data.map(row => ({
-          category:       (row['Category'] || '').toString().trim(),
-          type:           (row['Type'] || '').toString().trim(),
-          subType:        (row['Sub Type'] || '').toString().trim(),
-          preChecks:      (row['Pre-checks'] || '').toString().trim(),
-          escalationPath: (row['Escalation Path'] || '').toString().trim(),
-          extraDetails:   (row['Extra Details'] || '').toString().trim(),
-          loanCategory:   (row['Category'] || '').toString().trim().toLowerCase().includes('pre') ? 'pre' : 'post'
-        })).filter(r => r.subType !== '');
+          category:       (row['Category']       || '').toString().trim(),
+          type:           (row['Type']           || '').toString().trim(),
+          subType:        (row['Sub Type']       || '').toString().trim(),
+          preChecks:      (row['Pre-checks']     || '').toString().trim(),
+          escalationPath: (row['Escalation Path']|| '').toString().trim(),
+          extraDetails:   (row['Extra Details']  || '').toString().trim(),
+        })).filter(r => r.subType !== '' && r.type !== '');
 
         buildSidebar();
       } catch(e) {
@@ -411,34 +424,63 @@
     }
 
     function buildSidebar() {
-      const preTypes  = [...new Set(allData.filter(r => r.loanCategory === 'pre').map(r => r.type).filter(Boolean))];
-      const postTypes = [...new Set(allData.filter(r => r.loanCategory === 'post').map(r => r.type).filter(Boolean))];
+      // Group: category → ordered list of types (preserving sheet order, deduped)
+      const categoryMap = {};      // rawCat → Set of types
+      const categoryRawName = {};  // normalizedKey → first seen raw name from sheet
+
+      allData.forEach(r => {
+        if (!r.category || !r.type) return;
+        const key = normalizeKey(r.category);
+        if (!categoryMap[key]) {
+          categoryMap[key] = [];
+          categoryRawName[key] = r.category; // preserve original casing
+        }
+        if (!categoryMap[key].includes(r.type)) {
+          categoryMap[key].push(r.type);
+        }
+      });
+
+      // Sort categories by defined order
+      const sortedKeys = Object.keys(categoryMap).sort((a, b) => {
+        const oA = (CATEGORY_CONFIG[a] || { order: 99 }).order;
+        const oB = (CATEGORY_CONFIG[b] || { order: 99 }).order;
+        return oA - oB;
+      });
+
+      if (sortedKeys.length === 0) {
+        document.getElementById('sidebar').innerHTML =
+          '<div style="padding:20px;color:#999;font-size:13px;">No data found.</div>';
+        return;
+      }
 
       let html = '';
+      sortedKeys.forEach((key, idx) => {
+        const rawCat = categoryRawName[key];
+        const cfg    = getCategoryConfig(rawCat);
+        const types  = categoryMap[key];
 
-      if (preTypes.length > 0) {
-        html += `<div class="sidebar-section-title">🟡 Pre Loan</div>`;
-        preTypes.forEach(type => {
-          html += `<div class="sidebar-item ${currentType === type ? 'active' : ''}"
+        // Section title
+        html += `<div class="sidebar-section-title">${cfg.emoji} ${rawCat}</div>`;
+
+        types.forEach(type => {
+          const isActive = currentType === type ? 'active' : '';
+
+          // Important Update → bell icon; others → colored dot
+          const icon = cfg.isImportant
+            ? `<span class="bell-icon">🔔</span>`
+            : `<span class="dot ${cfg.dotClass}"></span>`;
+
+          html += `<div class="sidebar-item ${isActive}"
                         onclick="showSubTypes('${escQ(type)}')">
-                     <span class="dot dot-pre"></span>${type}
+                     ${icon}${type}
                    </div>`;
         });
-      }
 
-      if (preTypes.length > 0 && postTypes.length > 0) {
-        html += `<div class="sidebar-divider"></div>`;
-      }
-
-      if (postTypes.length > 0) {
-        html += `<div class="sidebar-section-title">🔵 Post Loan</div>`;
-        postTypes.forEach(type => {
-          html += `<div class="sidebar-item ${currentType === type ? 'active' : ''}"
-                        onclick="showSubTypes('${escQ(type)}')">
-                     <span class="dot dot-post"></span>${type}
-                   </div>`;
-        });
-      }
+        // Divider between sections — not after last
+        if (idx < sortedKeys.length - 1) {
+          html += `<div class="sidebar-divider"></div>`;
+        }
+      });
 
       document.getElementById('sidebar').innerHTML = html;
     }
@@ -448,15 +490,18 @@
       buildSidebar();
 
       const subtypes = allData.filter(r => r.type === type);
-      const loanLabel = subtypes[0]?.loanCategory === 'pre' ? '🟡 Pre Loan' : '🔵 Post Loan';
+      if (subtypes.length === 0) return;
+
+      const categoryLabel = getCategoryLabel(subtypes[0].category);
 
       let html = `
         <div class="screen-title">${type}</div>
-        <div class="screen-subtitle">${loanLabel} &nbsp;|&nbsp; ${subtypes.length} sub-type(s)</div>
+        <div class="screen-subtitle">${categoryLabel} &nbsp;|&nbsp; ${subtypes.length} sub-type(s)</div>
         <div class="cards-grid">`;
 
       subtypes.forEach(row => {
-        html += `<div class="card" onclick="showDetail(${allData.indexOf(row)})">
+        const idx = allData.indexOf(row);
+        html += `<div class="card" onclick="showDetail(${idx})">
                    <span class="card-text">${row.subType}</span>
                    <span class="card-arrow">›</span>
                  </div>`;
@@ -468,12 +513,14 @@
 
     function showDetail(index) {
       const row = allData[index];
-      const loanLabel = row.loanCategory === 'pre' ? '🟡 Pre Loan' : '🔵 Post Loan';
+      if (!row) return;
+
+      const categoryLabel = getCategoryLabel(row.category);
 
       let html = `
         <button class="back-btn" onclick="showSubTypes('${escQ(row.type)}')">← Back</button>
         <div class="screen-title">${row.subType}</div>
-        <div class="screen-subtitle">${loanLabel} › ${row.type}</div>`;
+        <div class="screen-subtitle">${categoryLabel} › ${row.type}</div>`;
 
       if (row.preChecks) {
         html += `<div class="detail-card"><h3>✅ Pre-Checks</h3><p>${parseLinks(row.preChecks)}</p></div>`;
@@ -499,10 +546,10 @@
       }
 
       const results = allData.filter(r =>
-        r.category.toLowerCase().includes(q) ||
-        r.type.toLowerCase().includes(q) ||
-        r.subType.toLowerCase().includes(q) ||
-        r.preChecks.toLowerCase().includes(q) ||
+        r.category.toLowerCase().includes(q)      ||
+        r.type.toLowerCase().includes(q)           ||
+        r.subType.toLowerCase().includes(q)        ||
+        r.preChecks.toLowerCase().includes(q)      ||
         r.escalationPath.toLowerCase().includes(q) ||
         r.extraDetails.toLowerCase().includes(q)
       );
@@ -512,13 +559,12 @@
         <div class="screen-subtitle">${results.length} result(s) for "${q}"</div>`;
 
       if (results.length === 0) {
-        html += `<div style="background:white;padding:20px;border-radius:12px;color:#888;">No results found.</div>`;
+        html += `<div style="background:white;padding:20px;border-radius:12px;color:#888;font-size:14px;">No results found.</div>`;
       } else {
         results.forEach(row => {
-          html += `<div class="search-result-item" onclick="showDetail(${allData.indexOf(row)})">
-                     <div class="s-type">
-                       ${row.loanCategory === 'pre' ? '🟡 Pre Loan' : '🔵 Post Loan'} › ${row.type}
-                     </div>
+          const idx = allData.indexOf(row);
+          html += `<div class="search-result-item" onclick="showDetail(${idx})">
+                     <div class="s-type">${getCategoryLabel(row.category)} › ${row.type}</div>
                      <div class="s-subtype">${row.subType}</div>
                    </div>`;
         });
@@ -527,11 +573,11 @@
       showContent(html);
     }
 
+    // Safely escape single quotes for inline onclick strings
     function escQ(str) {
-      return str.replace(/'/g, "\\'");
+      return (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     }
 
-    setLogoWithFallback();
     fetchData();
   </script>
 
