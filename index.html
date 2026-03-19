@@ -419,7 +419,8 @@
       categoryOrder.forEach((cat, idx) => {
         const types = categoryMap[cat];
 
-        html += `<div class="sidebar-section-title">${cat}</div>`;
+const isImportant = cat.toLowerCase().includes('important') || cat.toLowerCase().includes('update');
+html += `<div class="sidebar-section-title ${isImportant ? 'alert' : ''}">${isImportant ? '🔔 ' : ''}${cat}</div>`;
 
         types.forEach(type => {
           const isActive = currentType === type ? 'active' : '';
