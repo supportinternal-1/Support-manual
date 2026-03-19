@@ -127,17 +127,7 @@
       border-radius: 50%;
       flex-shrink: 0;
       display: inline-block;
-    }
-    .dot-pre              { background: #f5c518; }
-    .dot-post             { background: #2f3ac7; }
-    .dot-modules          { background: #9b59b6; }
-    .dot-line-enhancement { background: #27ae60; }
-    .dot-fallback         { background: #95a5a6; }
-
-    .bell-icon {
-      font-size: 14px;
-      flex-shrink: 0;
-      line-height: 1;
+      background: #2f3ac7;
     }
 
     .sidebar-divider {
@@ -352,37 +342,6 @@
     let allData = [];
     let currentType = null;
 
-    function normalizeKey(str) {
-      return (str || '').toString().trim().toLowerCase();
-    }
-
-    const CATEGORY_CONFIG = {
-      'important update':  { emoji: '🔔', dotClass: null,                  isImportant: true  },
-      'pre loan':          { emoji: '🟡', dotClass: 'dot-pre',              isImportant: false },
-      'post loan':         { emoji: '🔵', dotClass: 'dot-post',             isImportant: false },
-      'modules':           { emoji: '📘', dotClass: 'dot-modules',          isImportant: false },
-      'line enhancement':  { emoji: '🟢', dotClass: 'dot-line-enhancement', isImportant: false },
-    };
-
-    // Fixed sidebar order — Important Update is ALWAYS first
-    const FIXED_ORDER = [
-      'important update',
-      'pre loan',
-      'post loan',
-      'modules',
-      'line enhancement'
-    ];
-
-    function getCategoryConfig(rawCat) {
-      return CATEGORY_CONFIG[normalizeKey(rawCat)] ||
-             { emoji: '⚪', dotClass: 'dot-fallback', isImportant: false };
-    }
-
-    function getCategoryLabel(rawCat) {
-      const cfg = getCategoryConfig(rawCat);
-      return `${cfg.emoji} ${rawCat}`;
-    }
-
     function parseLinks(text) {
       text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
         '<a href="$2" target="_blank">$1</a>'
@@ -429,59 +388,48 @@
     }
 
     function buildSidebar() {
-      const categoryMap     = {};
-      const categoryRawName = {};
+      // ── Fully dynamic: preserves exact order from sheet ──
+      // Category order = first time each category appears in the sheet
+      // Type order = first time each type appears under that category in the sheet
+
+      const categoryOrder = [];   // ordered list of category names
+      const categoryMap   = {};   // category → ordered list of types
+      const typeCategory  = {};   // type → its category (for breadcrumb)
 
       allData.forEach(r => {
         if (!r.category || !r.type) return;
-        const key = normalizeKey(r.category);
-        if (!categoryMap[key]) {
-          categoryMap[key]     = [];
-          categoryRawName[key] = r.category;
+
+        if (!categoryMap[r.category]) {
+          categoryMap[r.category] = [];
+          categoryOrder.push(r.category);
         }
-        if (!categoryMap[key].includes(r.type)) {
-          categoryMap[key].push(r.type);
+        if (!categoryMap[r.category].includes(r.type)) {
+          categoryMap[r.category].push(r.type);
+          typeCategory[r.type] = r.category;
         }
       });
 
-      // Step 1: Add known categories in guaranteed fixed order
-      const sortedKeys = [];
-      FIXED_ORDER.forEach(key => {
-        if (categoryMap[key]) sortedKeys.push(key);
-      });
-
-      // Step 2: Append any unknown/future categories at the bottom
-      Object.keys(categoryMap).forEach(key => {
-        if (!FIXED_ORDER.includes(key)) sortedKeys.push(key);
-      });
-
-      if (sortedKeys.length === 0) {
+      if (categoryOrder.length === 0) {
         document.getElementById('sidebar').innerHTML =
           '<div style="padding:20px;color:#999;font-size:13px;">No data found.</div>';
         return;
       }
 
       let html = '';
-      sortedKeys.forEach((key, idx) => {
-        const rawCat = categoryRawName[key];
-        const cfg    = getCategoryConfig(rawCat);
-        const types  = categoryMap[key];
+      categoryOrder.forEach((cat, idx) => {
+        const types = categoryMap[cat];
 
-        html += `<div class="sidebar-section-title">${cfg.emoji} ${rawCat}</div>`;
+        html += `<div class="sidebar-section-title">${cat}</div>`;
 
         types.forEach(type => {
           const isActive = currentType === type ? 'active' : '';
-          const icon = cfg.isImportant
-            ? `<span class="bell-icon">🔔</span>`
-            : `<span class="dot ${cfg.dotClass}"></span>`;
-
           html += `<div class="sidebar-item ${isActive}"
                         onclick="showSubTypes('${escQ(type)}')">
-                     ${icon}${type}
+                     <span class="dot"></span>${type}
                    </div>`;
         });
 
-        if (idx < sortedKeys.length - 1) {
+        if (idx < categoryOrder.length - 1) {
           html += `<div class="sidebar-divider"></div>`;
         }
       });
@@ -496,11 +444,11 @@
       const subtypes = allData.filter(r => r.type === type);
       if (subtypes.length === 0) return;
 
-      const categoryLabel = getCategoryLabel(subtypes[0].category);
+      const cat = subtypes[0].category;
 
       let html = `
         <div class="screen-title">${type}</div>
-        <div class="screen-subtitle">${categoryLabel} &nbsp;|&nbsp; ${subtypes.length} sub-type(s)</div>
+        <div class="screen-subtitle">${cat} &nbsp;|&nbsp; ${subtypes.length} sub-type(s)</div>
         <div class="cards-grid">`;
 
       subtypes.forEach(row => {
@@ -518,12 +466,10 @@
       const row = allData[index];
       if (!row) return;
 
-      const categoryLabel = getCategoryLabel(row.category);
-
       let html = `
         <button class="back-btn" onclick="showSubTypes('${escQ(row.type)}')">← Back</button>
         <div class="screen-title">${row.subType}</div>
-        <div class="screen-subtitle">${categoryLabel} › ${row.type}</div>`;
+        <div class="screen-subtitle">${row.category} › ${row.type}</div>`;
 
       if (row.preChecks) {
         html += `<div class="detail-card"><h3>✅ Pre-Checks</h3><p>${parseLinks(row.preChecks)}</p></div>`;
@@ -566,7 +512,7 @@
       } else {
         results.forEach(row => {
           html += `<div class="search-result-item" onclick="showDetail(${allData.indexOf(row)})">
-                     <div class="s-type">${getCategoryLabel(row.category)} › ${row.type}</div>
+                     <div class="s-type">${row.category} › ${row.type}</div>
                      <div class="s-subtype">${row.subType}</div>
                    </div>`;
         });
