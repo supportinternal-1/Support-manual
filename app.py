@@ -23,6 +23,12 @@ SYNONYMS = {
     "selfie": ["selfie", "photo capture", "camera"],
     "bank": ["bank", "account verification", "lodgement"],
     "sell off": ["sell off", "selloff", "partial sell off"],
+    "otp not received": ["otp not received", "not getting otp", "otp missing"],
+    "mandate": ["mandate", "auto debit", "umrn", "upi mandate"],
+    "repayment": ["repayment", "payment", "emi", "pos not updated"],
+    "withdrawal": ["withdrawal", "disbursal", "amount not received"],
+    "foreclosure": ["foreclosure", "loan closure", "lien removal"],
+    "pledge": ["pledge", "pledging", "lien marking", "lamf"],
 }
 
 def normalize_text(t):
@@ -42,17 +48,32 @@ def expand_query(q):
 class SupportBot:
     def __init__(self, csv_path=CSV_PATH):
         self.df = pd.read_csv(csv_path).fillna("")
-        for c in ["Category", "Type", "Sub Type", "Pre-checks", "Escalation Path"]:
+        # New column names
+        for c in ["module", "category", "type", "sub_type", "keywords",
+                  "user_query_variants", "pre_checks", "answer_steps",
+                  "escalation_path", "platform", "priority"]:
             if c not in self.df.columns:
                 self.df[c] = ""
         self.df = self.df[
-            self.df[["Category", "Type", "Sub Type", "Pre-checks", "Escalation Path"]]
+            self.df[["category", "type", "sub_type", "pre_checks", "escalation_path"]]
             .astype(str)
             .apply(lambda r: any(v.strip() for v in r), axis=1)
         ].copy()
-        for c in ["Category", "Type", "Sub Type", "Pre-checks", "Escalation Path"]:
+        for c in ["module", "category", "type", "sub_type", "keywords",
+                  "user_query_variants", "pre_checks", "answer_steps",
+                  "escalation_path", "platform", "priority"]:
             self.df[c] = self.df[c].astype(str).str.replace(r"\s+", " ", regex=True).str.strip()
-        self.df["doc"] = self.df[["Category", "Type", "Sub Type", "Pre-checks", "Escalation Path"]].agg(" | ".join, axis=1)
+
+        # Build search document from all useful columns
+        self.df["doc"] = (
+            self.df["keywords"] + " | " +
+            self.df["user_query_variants"] + " | " +
+            self.df["category"] + " | " +
+            self.df["type"] + " | " +
+            self.df["sub_type"] + " | " +
+            self.df["pre_checks"]
+        )
+
         self.vectorizer = TfidfVectorizer(ngram_range=(1, 2), min_df=1)
         self.X = self.vectorizer.fit_transform(self.df["doc"])
         self.client = None
@@ -69,16 +90,20 @@ class SupportBot:
         q_low = q.lower()
         for i, row in self.df.iterrows():
             boost = 1.0
-            cat = normalize_text(row["Category"])
-            typ = normalize_text(row["Type"])
-            sub = normalize_text(row["Sub Type"])
+            cat = normalize_text(row["category"])
+            typ = normalize_text(row["type"])
+            sub = normalize_text(row["sub_type"])
+            kw  = normalize_text(row["keywords"])
+            uqv = normalize_text(row["user_query_variants"])
             if cat and cat in q_low:
                 boost *= CFG["category_boost"]
             if typ and typ in q_low:
                 boost *= CFG["category_boost"]
             if sub and sub in q_low:
                 boost *= CFG["subtype_boost"]
-            if any(x in q_low for x in [cat, typ, sub] if x):
+            if any(word in q_low for word in kw.split(", ") if len(word) > 3):
+                boost *= CFG["exact_match_boost"]
+            if any(variant.strip().lower() in q_low for variant in uqv.split("|") if len(variant.strip()) > 3):
                 boost *= CFG["exact_match_boost"]
             scores[i] *= boost
         idx = np.argsort(-scores)[:top_k]
@@ -90,7 +115,10 @@ class SupportBot:
         parts = []
         for _, r in hits.iterrows():
             parts.append(
-                f"Category: {r['Category']}\nType: {r['Type']}\nSub Type: {r['Sub Type']}\nPre-checks: {r['Pre-checks']}\nEscalation: {r['Escalation Path']}"
+                f"Issue: {r['sub_type']}\n"
+                f"Category: {r['category']} > {r['type']}\n"
+                f"Steps: {r['pre_checks']}\n"
+                f"Escalation: {r['escalation_path']}"
             )
         return "\n\n---\n\n".join(parts)
 
@@ -98,28 +126,27 @@ class SupportBot:
         if not self.client:
             best = hits.iloc[0]
             return (
-                f"I found a close match: {best['Category']} > {best['Type']} > {best['Sub Type']}.\n\n"
-                f"Pre-checks:\n{best['Pre-checks']}\n\nEscalation:\n{best['Escalation Path']}"
+                f"**Issue:** {best['sub_type']}\n\n"
+                f"**Steps to resolve:**\n{best['pre_checks']}\n\n"
+                f"**Escalation:** {best['escalation_path']}"
             )
         context = self.format_context(hits)
-        prompt = f"""You are a support assistant. Answer in a natural, clear, ChatGPT-like style.
-Use only the provided knowledge base context. If uncertain, say so and give the nearest matches.
-Keep it concise, practical, and friendly.
+        prompt = f"""You are a Volt Money customer support expert.
+A support agent is asking you about a customer issue.
+Answer like a knowledgeable colleague — directly, clearly, step by step.
+Do NOT use labels like "Category:" or "Type:" in your answer.
+Just give the direct helpful answer, steps, and escalation if needed.
+Keep it under 200 words.
 
-User query: {query}
+Agent query: {query}
 
-Knowledge base context:
+Knowledge base:
 {context}
-
-Return:
-1) direct answer
-2) steps or checks
-3) escalation if needed
 """
         resp = self.client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             messages=[
-                {"role": "system", "content": "You are a precise customer support assistant."},
+                {"role": "system", "content": "You are a precise, friendly Volt Money support assistant. Never show raw data. Always answer naturally."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.2,
@@ -132,19 +159,20 @@ Return:
         if best_score < CFG["confidence_threshold"]:
             return {
                 "status": "low_confidence",
-                "best_matches": hits[["Category", "Type", "Sub Type", "score"]].to_dict(orient="records"),
-                "response": "Mujhe exact match nahi mila. Nearest matches niche hain."
+                "response": "I couldn't find an exact match. Here are the closest results:",
+                "best_matches": hits[["category", "type", "sub_type", "score"]].to_dict(orient="records"),
             }
         return {
             "status": "success",
-            "best_matches": hits[["Category", "Type", "Sub Type", "score"]].to_dict(orient="records"),
-            "response": self.generate_llm(query, hits)
+            "response": self.generate_llm(query, hits),
+            "best_matches": hits[["category", "type", "sub_type", "score"]].head(1).to_dict(orient="records"),
         }
 
 if __name__ == "__main__":
     bot = SupportBot()
     while True:
-        q = input("Query: ").strip()
+        q = input("\nQuery: ").strip()
         if q.lower() in {"exit", "quit"}:
             break
-        print(json.dumps(bot.answer(q), ensure_ascii=False, indent=2))
+        result = bot.answer(q)
+        print("\n" + result["response"])
