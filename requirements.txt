@@ -2,5 +2,5 @@ pandas
 numpy
 scikit-learn
 rapidfuzz
+requests
 openai
-python-dotenv
