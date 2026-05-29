@@ -170,29 +170,28 @@ class SupportBot:
         if not self.client:
             best = hits.iloc[0]
             return (
-                f"Issue: {best['sub_type']}\n\n"
-                f"Steps:\n{best['pre_checks'] or best['answer_steps']}\n\n"
-                f"Escalation:\n{best['escalation_path']}"
+                f"{best['sub_type']}. {best['pre_checks'] or best['answer_steps']} "
+                f"If it still doesn't work, {best['escalation_path']}"
             )
 
         context = self.format_context(hits)
-        prompt = f"""You are a Volt Money support assistant.
-Answer naturally, like a helpful human expert.
-Do not use category labels unless helpful.
-Do not dump raw rows.
-Give a direct answer, then steps, then escalation if needed.
-Keep it concise.
+        prompt = f"""You are a helpful customer support assistant.
+Reply like ChatGPT in natural language.
+Do NOT use headings, bullet points, labels, or section titles unless absolutely necessary.
+Write in one or two smooth paragraphs.
+Be concise, human, and conversational.
+If the answer is uncertain, say so naturally.
+Use only the provided knowledge base context.
 
 User query: {query}
 
 Knowledge base context:
 {context}
 """
-
         resp = self.client.chat.completions.create(
             model=os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
             messages=[
-                {'role': 'system', 'content': 'You are a precise, friendly support assistant.'},
+                {'role': 'system', 'content': 'You are a precise, friendly support assistant. Speak naturally and avoid headings unless the user explicitly asks for structure.'},
                 {'role': 'user', 'content': prompt}
             ],
             temperature=0.2,
