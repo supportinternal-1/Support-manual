@@ -1,55 +1,106 @@
-[]
-  res.setHeader('Access-Control-Allow-Origin', '*');
+import express from "express";
 
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx2VehiToTYcCiFwzsUZZee0lRQv-H-8Bbd2huvReIKBWUv6SCw1zZ34-YDNHBhArjm/exec';
+const app = express();
 
-  const PRE_LOAN_TYPES = [
-    'login & mobile number registration',
-    'kyc issue'
-  ];
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-  function getLoanCategory(type) {
-    if (!type) return 'post';
-    return PRE_LOAN_TYPES.includes(type.toLowerCase().trim()) ? 'pre' : 'post';
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
+
+const APPS_SCRIPT_URL = "https://script.google.com/a/macros/voltmoney.in/s/AKfycbz7JFKm3oyxvpmG6u4A9FdFN6PhdeRNXvNACUwRAHRFDI4zSt19iylYxO-TG_y6bAUY/exec";
+
+const PRE_LOAN_TYPES = [
+  "login & mobile number registration",
+  "kyc issue"
+];
+
+function normalize(value) {
+  return (value ?? "").toString().trim();
+}
+
+function getLoanCategory(type) {
+  if (!type) return "post";
+  return PRE_LOAN_TYPES.includes(type.toLowerCase().trim()) ? "pre" : "post";
+}
+
+function buildFinalRows(parsed) {
+  const rows = Array.isArray(parsed) ? parsed : [];
+  const clean = rows.filter(row =>
+    normalize(row["Type"]) !== "" || normalize(row["Sub Type"]) !== ""
+  );
+
+  let lastType = "";
+  return clean.map(row => {
+    if (normalize(row["Type"]) !== "") {
+      lastType = normalize(row["Type"]);
+    }
+    return {
+      type: lastType,
+      subType: normalize(row["Sub Type"]),
+      preChecks: normalize(row["Pre-checks"]),
+      escalationPath: normalize(row["Escalation Path"]),
+      loanCategory: getLoanCategory(lastType)
+    };
+  });
+}
+
+async function fetchFromAppsScript() {
+  const response = await fetch(APPS_SCRIPT_URL, {
+    method: "GET",
+    redirect: "follow",
+    headers: {
+      "Accept": "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error: ${response.status}`);
   }
 
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return await response.json();
+  }
+
+  const text = await response.text();
   try {
-    // Node fetch use karo — redirect automatically handle hoga
-    const response = await fetch(APPS_SCRIPT_URL, {
-      method: 'GET',
-      redirect: 'follow'
-    });
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Apps Script did not return valid JSON.");
+  }
+}
 
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
-    }
+app.get("/health", (req, res) => {
+  res.status(200).json({ ok: true });
+});
 
-    const parsed = await response.json();
-
-    // Empty rows filter karo
-    const clean = parsed.filter(row =>
-      (row['Type'] && row['Type'].trim() !== '') ||
-      (row['Sub Type'] && row['Sub Type'].trim() !== '')
-    );
-
-    // Merged cells fix
-    let lastType = '';
-    const final = clean.map(row => {
-      if (row['Type'] && row['Type'].trim() !== '') {
-        lastType = row['Type'].trim();
-      }
-      return {
-        type: lastType,
-        subType: (row['Sub Type'] || '').trim(),
-        preChecks: (row['Pre-checks'] || '').trim(),
-        escalationPath: (row['Escalation Path'] || '').trim(),
-        loanCategory: getLoanCategory(lastType)
-      };
-    });
-
+app.get("/sync", async (req, res) => {
+  try {
+    const parsed = await fetchFromAppsScript();
+    const final = buildFinalRows(parsed);
     res.status(200).json(final);
-
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
-};
+});
+
+app.post("/sync", async (req, res) => {
+  try {
+    const parsed = await fetchFromAppsScript();
+    const final = buildFinalRows(parsed);
+    res.status(200).json(final);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
