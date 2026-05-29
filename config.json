@@ -1,5 +1,5 @@
 {
-  "data_url": "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE",
+  "data_url": "https://script.google.com/macros/s/AKfycbwevxPpmX1Hml0HvZ87hx3xPnbItSKr6MQMOyrbII6Fdo3iafaPkMmDSN67m5FiFQuq/exec",
   "cache_file": "live_cache.json",
   "top_k": 5,
   "confidence_threshold": 0.45,
