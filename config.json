@@ -1,7 +1,8 @@
 {
-  "sheet_path": "knowledge_base_90_accuracy.csv",
+  "data_url": "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE",
+  "cache_file": "live_cache.json",
   "top_k": 5,
-  "confidence_threshold": 0.55,
+  "confidence_threshold": 0.45,
   "exact_match_boost": 1.5,
   "category_boost": 1.2,
   "subtype_boost": 1.15,
